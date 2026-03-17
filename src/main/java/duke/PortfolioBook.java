@@ -1,3 +1,5 @@
+package duke;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -12,9 +14,9 @@ public class PortfolioBook {
         this.activePortfolioName = null;
     }
 
-    public void createPortfolio(String name) throws AppException {
+    public void createPortfolio(String name) throws IllegalArgumentException {
         if (portfolios.containsKey(name)) {
-            throw new AppException("Portfolio already exists: " + name);
+            throw new IllegalArgumentException("Portfolio already exists: " + name);
         }
 
         portfolios.put(name, new Portfolio(name));
@@ -24,15 +26,15 @@ public class PortfolioBook {
         }
     }
 
-    public void ensurePortfolioExists(String name) throws AppException {
+    public void ensurePortfolioExists(String name) throws IllegalArgumentException {
         if (!portfolios.containsKey(name)) {
             createPortfolio(name);
         }
     }
 
-    public void usePortfolio(String name) throws AppException {
+    public void usePortfolio(String name) throws IllegalArgumentException {
         if (!portfolios.containsKey(name)) {
-            throw new AppException("Portfolio not found: " + name);
+            throw new IllegalArgumentException("Portfolio not found: " + name);
         }
         activePortfolioName = name;
     }
@@ -41,9 +43,9 @@ public class PortfolioBook {
         return activePortfolioName != null;
     }
 
-    public Portfolio getActivePortfolio() throws AppException {
+    public Portfolio getActivePortfolio() throws IllegalArgumentException {
         if (activePortfolioName == null) {
-            throw new AppException("No active portfolio selected. Use: /use NAME");
+            throw new IllegalArgumentException("No active portfolio selected. Use: /use NAME");
         }
         return portfolios.get(activePortfolioName);
     }
