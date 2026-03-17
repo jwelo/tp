@@ -29,6 +29,18 @@ public class Ui {
         System.out.println("Type /help to see available commands.");
     }
 
+    public void showGoodbye() {
+        System.out.println("Thank you and goodbye.");
+    }
+
+    public void showMessage(String message) {
+        System.out.println(message);
+    }
+
+    public void showError(String message) {
+        System.out.println(message);
+    }
+
     public void showHelp() {
         String s = """
                    Available commands:

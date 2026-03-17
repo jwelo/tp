@@ -14,7 +14,7 @@ public class Storage {
         this.filePath = Paths.get(filePath);
     }
 
-    public PortfolioBook load() throws IllegalArgumentException {
+    public PortfolioBook load() throws AppException {
         createFileIfMissing();
 
         PortfolioBook portfolioBook = new PortfolioBook();
@@ -39,18 +39,18 @@ public class Storage {
                     break;
                 case "PORTFOLIO":
                     if (parts.length != 2) {
-                        throw new IllegalArgumentException("Corrupted storage file.");
+                        throw new AppException("Corrupted storage file.");
                     }
                     portfolioBook.createPortfolio(parts[1]);
                     break;
                 case "HOLDING":
                     if (parts.length != 7) {
-                        throw new IllegalArgumentException("Corrupted storage file.");
+                        throw new AppException("Corrupted storage file.");
                     }
                     loadHolding(parts, portfolioBook);
                     break;
                 default:
-                    throw new IllegalArgumentException("Corrupted storage file.");
+                    throw new AppException("Corrupted storage file.");
                 }
             }
 
@@ -60,11 +60,11 @@ public class Storage {
 
             return portfolioBook;
         } catch (IOException e) {
-            throw new IllegalArgumentException("Unable to read storage file.");
+            throw new AppException("Unable to read storage file.");
         }
     }
 
-    public void save(PortfolioBook portfolioBook) throws IllegalArgumentException {
+    public void save(PortfolioBook portfolioBook) throws AppException {
         createFileIfMissing();
 
         List<String> lines = new ArrayList<>();
@@ -87,13 +87,13 @@ public class Storage {
         try {
             Files.write(filePath, lines);
         } catch (IOException e) {
-            throw new IllegalArgumentException("Unable to save storage file.");
+            throw new AppException("Unable to save storage file.");
         }
     }
 
-    public BulkUpdateResult loadPriceUpdates(Path csvPath, Portfolio portfolio) throws IllegalArgumentException {
+    public BulkUpdateResult loadPriceUpdates(Path csvPath, Portfolio portfolio) throws AppException {
         if (!Files.exists(csvPath)) {
-            throw new IllegalArgumentException("File not found: " + csvPath);
+            throw new AppException("File not found: " + csvPath);
         }
 
         int successCount = 0;
@@ -103,12 +103,12 @@ public class Storage {
         try {
             List<String> lines = Files.readAllLines(csvPath);
             if (lines.isEmpty()) {
-                throw new IllegalArgumentException("CSV file is empty.");
+                throw new AppException("CSV file is empty.");
             }
 
             String header = lines.get(0).trim().toLowerCase();
             if (!header.equals("ticker,price")) {
-                throw new IllegalArgumentException("CSV header must be: ticker,price");
+                throw new AppException("CSV header must be: ticker,price");
             }
 
             for (int i = 1; i < lines.size(); i++) {
@@ -148,11 +148,11 @@ public class Storage {
 
             return new BulkUpdateResult(successCount, failedCount, failures);
         } catch (IOException e) {
-            throw new IllegalArgumentException("Unable to read CSV file.");
+            throw new AppException("Unable to read CSV file.");
         }
     }
 
-    private void loadHolding(String[] parts, PortfolioBook portfolioBook) throws IllegalArgumentException {
+    private void loadHolding(String[] parts, PortfolioBook portfolioBook) throws AppException {
         String portfolioName = parts[1];
         AssetType assetType = AssetType.fromString(parts[2]);
         String ticker = parts[3].toUpperCase();
@@ -161,7 +161,7 @@ public class Storage {
         try {
             quantity = Double.parseDouble(parts[4]);
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Corrupted storage file.");
+            throw new AppException("Corrupted storage file.");
         }
 
         portfolioBook.ensurePortfolioExists(portfolioName);
@@ -172,12 +172,12 @@ public class Storage {
             try {
                 portfolio.setPriceForTicker(ticker, Double.parseDouble(parts[5]));
             } catch (NumberFormatException e) {
-                throw new IllegalArgumentException("Corrupted storage file.");
+                throw new AppException("Corrupted storage file.");
             }
         }
     }
 
-    private void createFileIfMissing() throws IllegalArgumentException {
+    private void createFileIfMissing() throws AppException {
         try {
             Path parent = filePath.getParent();
             if (parent != null && !Files.exists(parent)) {
@@ -188,7 +188,7 @@ public class Storage {
                 Files.createFile(filePath);
             }
         } catch (IOException e) {
-            throw new IllegalArgumentException("Unable to create storage file.");
+            throw new AppException("Unable to create storage file.");
         }
     }
 
