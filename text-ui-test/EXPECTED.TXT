@@ -117,6 +117,7 @@ Total value: 1490.00
 
 ----------------------------------------
 Portfolio: RishPortfolio
+Current total value: 1490.00
 Realized P&L: +0.00
 Unrealised P&L by holding:
 VOO: Quantity 1.5, Avg. Price = 320.00, Last Price = 300.00, Unrealised P&L = -30.00
@@ -133,6 +134,7 @@ Updated price: VOO = 600.00
 
 ----------------------------------------
 Portfolio: RishPortfolio
+Current total value: 1940.00
 Realized P&L: +0.00
 Unrealised P&L by holding:
 VOO: Quantity 1.5, Avg. Price = 320.00, Last Price = 600.00, Unrealised P&L = +420.00
@@ -149,6 +151,7 @@ Sold 0.5 of VOO (stock) at 620.00, realized P&L = +150.00
 
 ----------------------------------------
 Portfolio: RishPortfolio
+Current total value: 1640.00
 Realized P&L: +150.00
 Unrealised P&L by holding:
 VOO: Quantity 1, Avg. Price = 320.00, Last Price = 600.00, Unrealised P&L = +280.00
@@ -165,6 +168,7 @@ Sold 0.5 of VOO (stock) at 600.00, realized P&L = +140.00
 
 ----------------------------------------
 Portfolio: RishPortfolio
+Current total value: 1340.00
 Realized P&L: +290.00
 Unrealised P&L by holding:
 VOO: Quantity 0.5, Avg. Price = 320.00, Last Price = 600.00, Unrealised P&L = +140.00
@@ -181,6 +185,7 @@ Sold 0.5 of VOO (stock) at 600.00, realized P&L = +140.00
 
 ----------------------------------------
 Portfolio: RishPortfolio
+Current total value: 1040.00
 Realized P&L: +430.00
 Unrealised P&L by holding:
 QQQ: Quantity 2, Avg. Price = 400.00, Last Price = 400.00, Unrealised P&L = +0.00
@@ -196,6 +201,7 @@ Sold 2 of QQQ (etf) at 405.00, realized P&L = +10.00
 
 ----------------------------------------
 Portfolio: RishPortfolio
+Current total value: 240.00
 Realized P&L: +440.00
 Unrealised P&L by holding:
 BND: Quantity 3, Avg. Price = 80.00, Last Price = 80.00, Unrealised P&L = +0.00
@@ -212,6 +218,7 @@ line 3 - ticker: MISSING reason: holding not found
 
 ----------------------------------------
 Portfolio: RishPortfolio
+Current total value: 246.00
 Realized P&L: +440.00
 Unrealised P&L by holding:
 BND: Quantity 3, Avg. Price = 80.00, Last Price = 82.00, Unrealised P&L = +6.00
