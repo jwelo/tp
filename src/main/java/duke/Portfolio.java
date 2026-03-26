@@ -63,8 +63,8 @@ public class Portfolio {
         } else if (holdingPrice != null) {
             effectivePrice = holdingPrice;
         } else {
-            throw new IllegalArgumentException("Price required for remove when holding has no last set price: " + ticker);
-        }
+            throw new IllegalArgumentException("Price required for remove when holding has no last set price: "
+                    + ticker);        }
 
         double realizedDelta = holding.removeQuantity(quantityToRemove, effectivePrice);
         totalRealizedPnl += realizedDelta;
@@ -111,7 +111,8 @@ public class Portfolio {
         return total;
     }
 
-    public void restoreHolding(AssetType assetType, String ticker, double quantity, Double lastPrice, double averageBuyPrice) {
+    public void restoreHolding(AssetType assetType, String ticker, double quantity,
+                               Double lastPrice, double averageBuyPrice) {
         Holding holding = new Holding(assetType, ticker, quantity, averageBuyPrice);
         holding.restoreMarketData(lastPrice, averageBuyPrice);
         holdings.put(makeKey(assetType, ticker), holding);

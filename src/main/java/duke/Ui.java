@@ -148,7 +148,8 @@ public class Ui {
         }
 
         System.out.println("Total holdings: " + (index - 1));
-        System.out.println("Total value: " + formatMoney(filterType == null ? portfolio.getPricedTotalValue() : filteredValueTotal));
+        double totalValue = (filterType == null) ? portfolio.getPricedTotalValue() : filteredValueTotal;
+        System.out.println("Total value: " + formatMoney(totalValue));
     }
 
     public void showPortfolioValue(Portfolio portfolio) {

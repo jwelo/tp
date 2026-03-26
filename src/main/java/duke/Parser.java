@@ -66,7 +66,8 @@ public class Parser {
         }
 
         if (!target.equals("--portfolios")) {
-            throw new AppException("Usage: /list or /list --stock or /list --etf or /list --bond or /list --portfolios");
+            throw new AppException("Usage: /list or /list --stock or /list --etf or /list --bond "
+                    + "or /list --portfolios");
         }
 
         return new ParsedCommand(CommandType.LIST, null, null, null, null, null, "--portfolios", null);

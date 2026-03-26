@@ -146,7 +146,11 @@ public class UiTest {
         assertTrue(output.contains("Realized P&L: +0.00"));
         assertTrue(output.contains("Unrealised P&L by holding:"));
         assertTrue(output.contains("BND: Quantity 10, Avg. Price = 70.00, Last Price = 70.00, Unrealised P&L = +0.00"));
-        assertTrue(output.contains("MSFT: Quantity 1, Avg. Price = 250.00, Last Price = 300.00, Unrealised P&L = +50.00"));
+        assertTrue(output.contains(
+                "BND: Quantity 10, Avg. Price = 70.00, Last Price = 70.00, Unrealised P&L = +0.00"));
+
+        assertTrue(output.contains(
+            "MSFT: Quantity 1, Avg. Price = 250.00, Last Price = 300.00, Unrealised P&L = +50.00"));
         assertTrue(output.contains("Total unrealised P&L: +50.00"));
     }
 
