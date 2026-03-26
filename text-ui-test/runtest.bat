@@ -3,6 +3,7 @@ setlocal enableextensions
 pushd %~dp0
 
 cd ..
+if exist data\CG2StocksTracker.txt del /q data\CG2StocksTracker.txt
 call gradlew clean shadowJar
 
 cd build\libs

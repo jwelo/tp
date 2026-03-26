@@ -44,10 +44,16 @@ public class Storage {
                     portfolioBook.createPortfolio(parts[1]);
                     break;
                 case "HOLDING":
-                    if (parts.length != 7) {
+                    if (parts.length != 7 && parts.length != 8) {
                         throw new AppException("Corrupted storage file.");
                     }
                     loadHolding(parts, portfolioBook);
+                    break;
+                case "PORTFOLIO_PNL":
+                    if (parts.length != 4) {
+                        throw new AppException("Corrupted storage file.");
+                    }
+                    loadPortfolioPnl(parts, portfolioBook);
                     break;
                 default:
                     throw new AppException("Corrupted storage file.");
@@ -72,6 +78,7 @@ public class Storage {
 
         for (Portfolio portfolio : portfolioBook.getPortfolios()) {
             lines.add("PORTFOLIO|" + portfolio.getName());
+            lines.add("PORTFOLIO_PNL|" + portfolio.getName() + "|" + portfolio.getTotalRealizedPnl() + "|v1");
             for (Holding holding : portfolio.getHoldings()) {
                 String priceText = holding.hasPrice() ? String.valueOf(holding.getLastPrice()) : "";
                 lines.add("HOLDING|"
@@ -80,7 +87,8 @@ public class Storage {
                         + holding.getTicker() + "|"
                         + holding.getQuantity() + "|"
                         + priceText + "|"
-                        + "v1");
+                        + holding.getAverageBuyPrice() + "|"
+                        + "v2");
             }
         }
 
@@ -166,15 +174,42 @@ public class Storage {
 
         portfolioBook.ensurePortfolioExists(portfolioName);
         Portfolio portfolio = portfolioBook.getPortfolio(portfolioName);
-        portfolio.addHolding(assetType, ticker, quantity);
 
+        Double lastPrice = null;
         if (!parts[5].isBlank()) {
             try {
-                portfolio.setPriceForTicker(ticker, Double.parseDouble(parts[5]));
+                lastPrice = Double.parseDouble(parts[5]);
             } catch (NumberFormatException e) {
                 throw new AppException("Corrupted storage file.");
             }
         }
+
+        double averageBuyPrice;
+        if (parts.length == 7) {
+            averageBuyPrice = lastPrice == null ? 0.0 : lastPrice;
+        } else {
+            try {
+                averageBuyPrice = Double.parseDouble(parts[6]);
+            } catch (NumberFormatException e) {
+                throw new AppException("Corrupted storage file.");
+            }
+        }
+
+        portfolio.restoreHolding(assetType, ticker, quantity, lastPrice, averageBuyPrice);
+    }
+
+    private void loadPortfolioPnl(String[] parts, PortfolioBook portfolioBook) throws AppException {
+        String portfolioName = parts[1];
+        double realizedPnl;
+        try {
+            realizedPnl = Double.parseDouble(parts[2]);
+        } catch (NumberFormatException e) {
+            throw new AppException("Corrupted storage file.");
+        }
+
+        portfolioBook.ensurePortfolioExists(portfolioName);
+        Portfolio portfolio = portfolioBook.getPortfolio(portfolioName);
+        portfolio.setTotalRealizedPnl(realizedPnl);
     }
 
     private void createFileIfMissing() throws AppException {

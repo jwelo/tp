@@ -4,6 +4,7 @@
 cd "${0%/*}"
 
 cd ..
+rm -f data/CG2StocksTracker.txt
 ./gradlew clean shadowJar
 
 cd text-ui-test
