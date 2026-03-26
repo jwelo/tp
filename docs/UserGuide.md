@@ -121,12 +121,13 @@ CSV header must be:
 `ticker,price`
 
 ### View valuation and P&L: `/value`
-Shows portfolio-level realized P&L and unrealized P&L by holding.
+Shows portfolio-level current total value, realized P&L, and unrealized P&L by holding.
 
 Format:
 `/value`
 
 Output contains:
+- `Current total value`: sum of `quantity * current unit price` across holdings in the active portfolio.
 - `Realized P&L`: cumulative P&L from completed sells (positive or negative).
 - `Unrealised P&L by holding`: one row per holding.
 - `Total unrealised P&L`: sum across holdings.
