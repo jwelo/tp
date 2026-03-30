@@ -118,33 +118,174 @@ The UI does not perform any parsing or business logic.
 
 ### Overview
 
-The Logic component is implemented mainly by:
-
-- `CG2StocksTracker`
-
-- `Parser`
-
-- `ParsedCommand`
-
+The command parsing subsystem is responsible for translating raw user input strings into structured, type-safe command objects that the rest of the application can act upon. It is composed of three tightly related classes: `CommandType`, `ParsedCommand`, and `Parser`. Together, they form a clean separation between the *syntax* of a command (what the user typed), the *semantics* of a command (what it means), and the *dispatch* of a command (what should happen).
 
 ---
 
-### How the Logic component works
+### Architecture-Level Description
 
-When a command is executed:
+At the architecture level, the parsing subsystem sits between the user interface layer and the application logic layer. The main application loop in `CG2StocksTracker` reads a raw string from `Ui`, hands it to `Parser`, and receives back a `ParsedCommand`. The application then switches on the `CommandType` contained within that `ParsedCommand` to decide which handler to invoke.
 
-1. `CG2StocksTracker` receives the command string
-
-2. The command is passed to `Parser`
-
-3. `Parser` converts the string into a `ParsedCommand`
-
-4. `CG2StocksTracker` inspects the command type
-
-5. The corresponding operation is executed
-
+This design keeps the application loop simple: it never inspects raw strings itself, and it never needs to know how options are encoded. All of that knowledge is encapsulated in `Parser`.
 
 ---
+
+### Component-Level Description
+
+#### `CommandType` — The Command Vocabulary
+
+`CommandType` is a Java `enum` that enumerates every command the application understands:
+
+```
+CREATE, USE, LIST, ADD, REMOVE, SET, SET_MANY, VALUE, HELP, EXIT
+```
+
+Its role is to serve as the single authoritative list of valid commands. Using an enum instead of raw strings eliminates
+an entire class of bugs: a typo like `"CREAT"` is caught at compile time rather than causing a silent mismatch at 
+runtime. It also makes exhaustive `switch` statements possible — the compiler can warn if a new `CommandType` value is 
+added but not handled.
+
+**Design decision:** The enum is kept intentionally minimal — it carries no behaviour, no labels, and no metadata. This 
+keeps the command vocabulary cleanly decoupled from parsing logic and from execution logic. An alternative considered 
+was storing a display name or usage string inside the enum. This was rejected because it would mix concerns; usage 
+strings belong in `Ui`.
+
+---
+
+#### `ParsedCommand` — The Data Transfer Object
+
+`ParsedCommand` is a Java `record` that carries all the information the application needs to execute a command:
+
+```java
+public record ParsedCommand(
+    CommandType type,
+    String name,
+    AssetType assetType,
+    String ticker,
+    Double quantity,
+    Double price,
+    String listTarget,
+    Path filePath
+)
+```
+
+Records in Java are implicitly immutable and generate `equals`, `hashCode`, and `toString` automatically. This makes 
+`ParsedCommand` safe to pass around without defensive copying.
+
+Not every field is populated for every command. For example, a `VALUE` command needs no fields beyond `type`, while an 
+`ADD` command needs `assetType`, `ticker`, and `quantity`. Fields that are not applicable for a given command are simply
+`null`.
+
+**Design decision:** A single record with nullable fields was chosen over a class hierarchy (e.g. a `CreateCommand 
+extends ParsedCommand` pattern). The hierarchy approach would have been more type-safe in principle, but for a CLI 
+application of this scale, the added boilerplate outweighs the benefit. The flat record is simpler to construct, simpler
+to test, and straightforward to extend when new commands are added.
+
+**Alternative considered:** Using `Optional<T>` instead of nullable fields. This was considered to make the "may be 
+absent" contract explicit, but Java records with `Optional` fields carry more syntactic overhead at construction sites 
+(e.g., `Optional.of(...)`, `Optional.empty()`) which clutters the `Parser` code without adding meaningful safety at this
+scale.
+
+---
+
+#### `Parser` — The Core Logic
+
+`Parser` is a stateless class with a single public entry point:
+
+```java
+public ParsedCommand parse(String input) throws AppException
+```
+
+Internally, parsing proceeds in two stages: **tokenisation** and **command-specific parsing**.
+
+##### Stage 1: Tokenisation
+
+The `tokenise` method splits the input string on whitespace, with support for double-quoted tokens. This allows 
+arguments containing spaces (such as a portfolio name like `"My Portfolio"`) to be passed as a single token.
+
+The tokeniser iterates character by character, tracking an `inQuotes` boolean flag. When the flag is active, whitespace 
+is treated as a regular character rather than a delimiter. An unclosed quote is detected at the end of the loop and 
+raises an `AppException`.
+
+For example, the input `/add --type stock --ticker "BRK A" --qty 10` produces the token list `["/add", "--type", 
+"stock", "--ticker", "BRK A", "--qty", "10"]`.
+
+**Design decision:** A hand-written character-by-character tokeniser was used rather than `String.split()` or a regular 
+expression, because neither handles quoted tokens natively without significant complexity. A proper lexer library was 
+not used because the grammar is simple enough that the overhead of a dependency is not justified.
+
+##### Stage 2: Command-Specific Parsing
+
+After tokenisation, the first token (the command word, e.g. `/add`) is extracted and matched using a `switch` 
+expression. Each `case` delegates to a dedicated private method:
+
+```java
+return switch (commandWord) {
+    case "create" -> parseCreate(tokens);
+    case "add"    -> parseAdd(tokens);
+    case "set"    -> parseSet(tokens);
+    // ...
+};
+```
+
+Commands that accept named options (e.g. `--type`, `--ticker`, `--qty`) go through `parseOptions`, which reads tokens in
+key-value pairs and populates a `Map<String, String>`. The helper `requireOption` then asserts that a required key is 
+present, throwing a descriptive `AppException` if it is missing.
+
+Two additional helpers enforce type safety: `parsePositiveDouble` parses a string to a `double` and asserts it is 
+strictly positive (used for `--qty` and `--price`), while `normaliseTicker` uppercases the ticker string so that `aapl` 
+and `AAPL` are treated identically regardless of how the user typed them.
+
+---
+
+### Sequence Diagram: Parsing a `/add` Command
+
+The following sequence diagram illustrates what happens when the user types `/add --type stock --ticker AAPL --qty 10`.
+
+<!-- INSERT SEQUENCE DIAGRAM 1 HERE -->
+
+---
+
+### Sequence Diagram: Handling an Invalid Command
+
+The following shows what happens when the user enters a malformed command, such as `/add --type stock` (missing 
+`--ticker` and `--qty`). The `AppException` thrown by `requireOption` propagates back to `CG2StocksTracker.run()`, which
+catches it and routes it to `Ui.showError()`. This ensures that all user-facing errors are displayed consistently 
+regardless of which stage of parsing failed.
+
+<!-- INSERT SEQUENCE DIAGRAM 2 HERE -->
+
+---
+
+### Error Handling Strategy
+
+All parsing errors are reported via `AppException`, a checked application-specific exception. This was a deliberate 
+choice over using unchecked exceptions: callers are forced by the compiler to handle or propagate the exception, making 
+it impossible to accidentally swallow a parse error. The messages in `AppException` are written in plain English and 
+include usage hints (e.g., `"Usage: /add --type TYPE --ticker TICKER --qty QTY"`), making them suitable for direct 
+display to the user.
+
+---
+
+### Alternatives Considered
+
+| Design Choice | Chosen Approach | Alternative | Reason for Choice |
+|---|---|---|---|
+| Command representation | `enum CommandType` | String constants | Compile-time safety, exhaustive switch |
+| Parsed data container | Java `record` (flat) | Class hierarchy per command type | Simpler code, adequate for scale |
+| Optional fields | Nullable fields | `Optional<T>` fields | Less construction-site boilerplate |
+| Tokenisation | Hand-written char loop | `String.split` / regex | Handles quoted tokens naturally |
+| Error signalling | Checked `AppException` | Unchecked `RuntimeException` | Forces callers to handle errors |
+
+---
+
+### Summary
+
+The parsing subsystem deliberately keeps each class narrowly focused. `CommandType` is the vocabulary. `ParsedCommand` 
+is the data carrier. `Parser` is the translation logic. No class bleeds into the other's responsibility. This separation
+means that adding a new command in the future requires only: adding a value to `CommandType`, adding a `case` to 
+`Parser.parse()` with a corresponding `parseX()` method, and adding a handler in `CG2StocksTracker.execute()`. No other 
+files need to change.
 
 ### Class Diagram
 
@@ -189,6 +330,8 @@ This approach was chosen because:
 However, it means that adding new commands requires modifying existing code instead of adding new classes.
 
 ---
+
+
 
 ## Model Component
 
