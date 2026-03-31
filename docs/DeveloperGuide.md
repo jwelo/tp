@@ -141,13 +141,13 @@ CREATE, USE, LIST, ADD, REMOVE, SET, SET_MANY, VALUE, HELP, EXIT
 ```
 
 Its role is to serve as the single authoritative list of valid commands. Using an enum instead of raw strings eliminates
-an entire class of bugs: a typo like `"CREAT"` is caught at compile time rather than causing a silent mismatch at 
-runtime. It also makes exhaustive `switch` statements possible — the compiler can warn if a new `CommandType` value is 
+an entire class of bugs: a typo like `"CREAT"` is caught at compile time rather than causing a silent mismatch at
+runtime. It also makes exhaustive `switch` statements possible — the compiler can warn if a new `CommandType` value is
 added but not handled.
 
-**Design decision:** The enum is kept intentionally minimal — it carries no behaviour, no labels, and no metadata. This 
-keeps the command vocabulary cleanly decoupled from parsing logic and from execution logic. An alternative considered 
-was storing a display name or usage string inside the enum. This was rejected because it would mix concerns; usage 
+**Design decision:** The enum is kept intentionally minimal — it carries no behaviour, no labels, and no metadata. This
+keeps the command vocabulary cleanly decoupled from parsing logic and from execution logic. An alternative considered
+was storing a display name or usage string inside the enum. This was rejected because it would mix concerns; usage
 strings belong in `Ui`.
 
 ---
@@ -165,24 +165,30 @@ public record ParsedCommand(
     Double quantity,
     Double price,
     String listTarget,
-    Path filePath
+    Path filePath,
+    Double brokerageFee,
+    Double fxFee,
+    Double platformFee
 )
 ```
 
-Records in Java are implicitly immutable and generate `equals`, `hashCode`, and `toString` automatically. This makes 
+Records in Java are implicitly immutable and generate `equals`, `hashCode`, and `toString` automatically. This makes
 `ParsedCommand` safe to pass around without defensive copying.
 
-Not every field is populated for every command. For example, a `VALUE` command needs no fields beyond `type`, while an 
-`ADD` command needs `assetType`, `ticker`, and `quantity`. Fields that are not applicable for a given command are simply
-`null`.
+Not every field is populated for every command. For example, a `VALUE` command needs no fields beyond `type`, while an
+`ADD` command needs `assetType`, `ticker`, `quantity`, and may optionally include fee fields. Fields that are not
+applicable for a given command are simply `null`.
 
-**Design decision:** A single record with nullable fields was chosen over a class hierarchy (e.g. a `CreateCommand 
-extends ParsedCommand` pattern). The hierarchy approach would have been more type-safe in principle, but for a CLI 
+`ParsedCommand` also exposes `totalFees()`, which combines `brokerageFee`, `fxFee`, and `platformFee` into one value
+before command execution.
+
+**Design decision:** A single record with nullable fields was chosen over a class hierarchy (e.g. a `CreateCommand
+extends ParsedCommand` pattern). The hierarchy approach would have been more type-safe in principle, but for a CLI
 application of this scale, the added boilerplate outweighs the benefit. The flat record is simpler to construct, simpler
 to test, and straightforward to extend when new commands are added.
 
-**Alternative considered:** Using `Optional<T>` instead of nullable fields. This was considered to make the "may be 
-absent" contract explicit, but Java records with `Optional` fields carry more syntactic overhead at construction sites 
+**Alternative considered:** Using `Optional<T>` instead of nullable fields. This was considered to make the "may be
+absent" contract explicit, but Java records with `Optional` fields carry more syntactic overhead at construction sites
 (e.g., `Optional.of(...)`, `Optional.empty()`) which clutters the `Parser` code without adding meaningful safety at this
 scale.
 
@@ -200,23 +206,23 @@ Internally, parsing proceeds in two stages: **tokenisation** and **command-speci
 
 ##### Stage 1: Tokenisation
 
-The `tokenise` method splits the input string on whitespace, with support for double-quoted tokens. This allows 
+The `tokenise` method splits the input string on whitespace, with support for double-quoted tokens. This allows
 arguments containing spaces (such as a portfolio name like `"My Portfolio"`) to be passed as a single token.
 
-The tokeniser iterates character by character, tracking an `inQuotes` boolean flag. When the flag is active, whitespace 
-is treated as a regular character rather than a delimiter. An unclosed quote is detected at the end of the loop and 
+The tokeniser iterates character by character, tracking an `inQuotes` boolean flag. When the flag is active, whitespace
+is treated as a regular character rather than a delimiter. An unclosed quote is detected at the end of the loop and
 raises an `AppException`.
 
-For example, the input `/add --type stock --ticker "BRK A" --qty 10` produces the token list `["/add", "--type", 
+For example, the input `/add --type stock --ticker "BRK A" --qty 10` produces the token list `["/add", "--type",
 "stock", "--ticker", "BRK A", "--qty", "10"]`.
 
-**Design decision:** A hand-written character-by-character tokeniser was used rather than `String.split()` or a regular 
-expression, because neither handles quoted tokens natively without significant complexity. A proper lexer library was 
+**Design decision:** A hand-written character-by-character tokeniser was used rather than `String.split()` or a regular
+expression, because neither handles quoted tokens natively without significant complexity. A proper lexer library was
 not used because the grammar is simple enough that the overhead of a dependency is not justified.
 
 ##### Stage 2: Command-Specific Parsing
 
-After tokenisation, the first token (the command word, e.g. `/add`) is extracted and matched using a `switch` 
+After tokenisation, the first token (the command word, e.g. `/add`) is extracted and matched using a `switch`
 expression. Each `case` delegates to a dedicated private method:
 
 ```java
@@ -229,12 +235,14 @@ return switch (commandWord) {
 ```
 
 Commands that accept named options (e.g. `--type`, `--ticker`, `--qty`) go through `parseOptions`, which reads tokens in
-key-value pairs and populates a `Map<String, String>`. The helper `requireOption` then asserts that a required key is 
+key-value pairs and populates a `Map<String, String>`. The helper `requireOption` then asserts that a required key is
 present, throwing a descriptive `AppException` if it is missing.
 
-Two additional helpers enforce type safety: `parsePositiveDouble` parses a string to a `double` and asserts it is 
-strictly positive (used for `--qty` and `--price`), while `normaliseTicker` uppercases the ticker string so that `aapl` 
-and `AAPL` are treated identically regardless of how the user typed them.
+For `/add` and `/remove`, the parser also reads optional fee fields such as `--brokerage`, `--fx`, and `--platform`.
+
+Two additional helpers enforce type safety: `parsePositiveDouble` parses a string to a `double` and asserts it is
+strictly positive (used for `--qty`, `--price`, and fee fields), while `normaliseTicker` uppercases the ticker string so
+that `aapl` and `AAPL` are treated identically regardless of how the user typed them.
 
 ---
 
@@ -248,9 +256,9 @@ The following sequence diagram illustrates what happens when the user types `/ad
 
 ### Sequence Diagram: Handling an Invalid Command
 
-The following shows what happens when the user enters a malformed command, such as `/add --type stock` (missing 
+The following shows what happens when the user enters a malformed command, such as `/add --type stock` (missing
 `--ticker` and `--qty`). The `AppException` thrown by `requireOption` propagates back to `CG2StocksTracker.run()`, which
-catches it and routes it to `Ui.showError()`. This ensures that all user-facing errors are displayed consistently 
+catches it and routes it to `Ui.showError()`. This ensures that all user-facing errors are displayed consistently
 regardless of which stage of parsing failed.
 
 <!-- INSERT SEQUENCE DIAGRAM 2 HERE -->
@@ -259,10 +267,10 @@ regardless of which stage of parsing failed.
 
 ### Error Handling Strategy
 
-All parsing errors are reported via `AppException`, a checked application-specific exception. This was a deliberate 
-choice over using unchecked exceptions: callers are forced by the compiler to handle or propagate the exception, making 
-it impossible to accidentally swallow a parse error. The messages in `AppException` are written in plain English and 
-include usage hints (e.g., `"Usage: /add --type TYPE --ticker TICKER --qty QTY"`), making them suitable for direct 
+All parsing errors are reported via `AppException`, a checked application-specific exception. This was a deliberate
+choice over using unchecked exceptions: callers are forced by the compiler to handle or propagate the exception, making
+it impossible to accidentally swallow a parse error. The messages in `AppException` are written in plain English and
+include usage hints (e.g., `"Usage: /add --type TYPE --ticker TICKER --qty QTY"`), making them suitable for direct
 display to the user.
 
 ---
@@ -281,10 +289,10 @@ display to the user.
 
 ### Summary
 
-The parsing subsystem deliberately keeps each class narrowly focused. `CommandType` is the vocabulary. `ParsedCommand` 
+The parsing subsystem deliberately keeps each class narrowly focused. `CommandType` is the vocabulary. `ParsedCommand`
 is the data carrier. `Parser` is the translation logic. No class bleeds into the other's responsibility. This separation
-means that adding a new command in the future requires only: adding a value to `CommandType`, adding a `case` to 
-`Parser.parse()` with a corresponding `parseX()` method, and adding a handler in `CG2StocksTracker.execute()`. No other 
+means that adding a new command in the future requires only: adding a value to `CommandType`, adding a `case` to
+`Parser.parse()` with a corresponding `parseX()` method, and adding a handler in `CG2StocksTracker.execute()`. No other
 files need to change.
 
 ### Class Diagram
@@ -307,6 +315,10 @@ class ParsedCommand {
     +quantity
     +price
     +filePath
+    +brokerageFee
+    +fxFee
+    +platformFee
+    +totalFees()
 }
 
 CG2StocksTracker --> Parser
@@ -354,16 +366,14 @@ It consists of:
 
 - `PortfolioBook` stores all portfolios and tracks the active portfolio
 
-- `Portfolio` stores holdings using an internal collection
+- `Portfolio` stores holdings using an internal collection and keeps track of cumulative realized P&L
 
-- `Holding` stores ticker, quantity, and price
+- `Holding` stores asset type, ticker, quantity, last price, and average buy price
 
 
 ---
 
 ### Class Diagram
-
-
 
 ---
 
@@ -401,9 +411,9 @@ The Storage component is responsible for:
 
 ### How the Storage component works
 
-- `save(...)` writes the current state to file
+- `save(...)` writes the current state to file, including portfolio realized P&L, holding quantity, average buy price, and last price
 
-- `load(...)` reads data during application startup
+- `load(...)` reads data during application startup and restores holdings using the stored average buy price and last price
 
 - `loadPriceUpdates(...)` processes CSV input
 
@@ -432,8 +442,6 @@ This section describes how commands are executed in the application.
 ---
 
 ### Sequence Diagram
-
-
 
 ---
 
@@ -479,7 +487,6 @@ Steps:
 
 ### Sequence Diagram
 
-
 ---
 
 ### Explanation
@@ -507,22 +514,32 @@ Steps:
 
 1. Retrieve active portfolio
 
-2. Call `Portfolio.addHolding(...)`
+2. `CG2StocksTracker.handleAdd(...)` reads `ParsedCommand.totalFees()`
 
-3. Update existing holding or create new one
+3. Call `Portfolio.addHolding(...)`
 
-4. Save state
+4. Update existing holding or create new one
 
-5. Display result
+5. If the holding already exists, recalculate average buy price using weighted average cost
+
+6. If fees are provided, include them in the effective purchase cost
+
+7. Save state
+
+8. Display result
 
 
 ---
 
 ### Explanation
 
-The logic is handled inside `Portfolio` to ensure that:
+The logic is handled inside `Portfolio` and `Holding` to ensure that:
 
 - Holdings are managed consistently
+
+- Average buy price is updated correctly
+
+- Fees are incorporated into cost basis
 
 - The controller does not duplicate logic
 
@@ -537,24 +554,171 @@ The `remove` command removes a holding.
 
 If the holding does not exist, an error is returned.
 
+When the holding exists, the system computes realized P&L using the holding's stored average buy price and updates the portfolio's cumulative realized P&L before saving the updated state. If fees are provided, they are deducted from realized profit/loss.
+
 ---
 
 ### Sequence Diagram
 
+```plantuml
+@startuml
+title Interactions for /remove Command
 
+actor User
+participant Ui
+participant CG2StocksTracker
+participant Parser
+participant ParsedCommand
+participant Portfolio
+participant Holding
+participant Storage
+
+User -> Ui : enters /remove ... --price ... --brokerage ...
+Ui -> CG2StocksTracker : read command
+CG2StocksTracker -> Parser : parse(input)
+Parser --> CG2StocksTracker : ParsedCommand
+CG2StocksTracker -> ParsedCommand : totalFees()
+ParsedCommand --> CG2StocksTracker : fees
+CG2StocksTracker -> Portfolio : removeHolding(type, ticker, qty, price, fees)
+
+Portfolio -> Holding : removeQuantity(quantityToRemove, effectivePrice, fees)
+Holding --> Portfolio : realizedDelta
+
+Portfolio -> Portfolio : totalRealizedPnl += realizedDelta
+Portfolio --> CG2StocksTracker : RemoveResult
+
+CG2StocksTracker -> Storage : save(portfolioBook)
+Storage --> CG2StocksTracker : success
+
+CG2StocksTracker -> Ui : show sold quantity,\nsell price, realized P&L
+Ui --> User : result displayed
+@enduml
+```
 
 ---
 
 ### Explanation
 
-This diagram shows two possible outcomes:
+This diagram shows the main flow for the `/remove` command.
 
-- If the holding exists, it is removed and saved
+The important points are:
 
-- If it does not exist, an error is shown
+- `ParsedCommand` aggregates fee fields
+
+- `Holding` computes realized P&L using average buy price and deducts fees
+
+- `Portfolio` updates cumulative realized P&L
+
+- The updated state is saved immediately after modification
 
 
 This ensures that invalid operations do not modify the system state.
+
+---
+
+## Cost basis and P&L tracking
+
+This section describes some noteworthy details on how cost basis persistence and P&L calculation are implemented.
+
+### Implementation
+
+The cost basis and P&L tracking mechanism is facilitated by `Holding`, `Portfolio`, and `Storage`.
+
+- `Holding` stores the asset type, ticker, quantity, last price, and average buy price.
+- `Portfolio` stores all holdings in a portfolio and keeps track of cumulative realized P&L.
+- `Storage` saves and restores the information required for accurate P&L calculation across application restarts.
+
+When the user executes the `/add` command for an existing holding, the holding does not create a separate transaction record. Instead, the system updates the existing holding’s quantity and recalculates its average buy price using weighted average cost.
+
+If fees are provided, they are included in the effective purchase cost.
+
+The formula used is:
+
+`newAvg = (oldQty * oldAvg + addedQty * (addedPrice + fees / addedQty)) / (oldQty + addedQty)`
+
+When the user executes the `/remove` command, the system computes realized P&L using the holding’s stored average buy price.
+
+If fees are provided, they are deducted from the realized P&L.
+
+The formula used is:
+
+`realizedPnl = (sellPrice - averageBuyPrice) * quantitySold - fees`
+
+Unrealized P&L is computed from the last saved market price:
+
+`unrealizedPnl = (lastPrice - averageBuyPrice) * quantity`
+
+To ensure correctness across sessions, the Storage component persists:
+
+- portfolio realized P&L
+- holding quantity
+- holding average buy price
+- holding last price
+
+During loading, the system reconstructs holdings using the stored average buy price instead of inferring cost basis from market price. This prevents incorrect gains/losses after restarting the application.
+
+Legacy storage files are still supported. If an older holding record does not contain a separate average buy price field, the stored price is used as both the restored market price and the restored average buy price.
+
+### Sequence Diagram
+
+The following sequence diagram shows how the `/remove` command updates realized P&L and persists the updated state.
+
+```plantuml
+@startuml
+title Interactions for /remove Command
+
+actor User
+participant Ui
+participant CG2StocksTracker
+participant Parser
+participant ParsedCommand
+participant Portfolio
+participant Holding
+participant Storage
+
+User -> Ui : enters /remove ... --price ... --brokerage ...
+Ui -> CG2StocksTracker : read command
+CG2StocksTracker -> Parser : parse(input)
+Parser --> CG2StocksTracker : ParsedCommand
+CG2StocksTracker -> ParsedCommand : totalFees()
+ParsedCommand --> CG2StocksTracker : fees
+CG2StocksTracker -> Portfolio : removeHolding(type, ticker, qty, price, fees)
+
+Portfolio -> Holding : removeQuantity(quantityToRemove, effectivePrice, fees)
+Holding --> Portfolio : realizedDelta
+
+Portfolio -> Portfolio : totalRealizedPnl += realizedDelta
+Portfolio --> CG2StocksTracker : RemoveResult
+
+CG2StocksTracker -> Storage : save(portfolioBook)
+Storage --> CG2StocksTracker : success
+
+CG2StocksTracker -> Ui : show sold quantity,\nsell price, realized P&L
+Ui --> User : result displayed
+@enduml
+```
+
+### Design considerations
+
+Aspect: How cost basis is tracked.
+
+**Alternative 1 (current choice):** Store average buy price directly in each `Holding`.
+Pros: Simple to implement and efficient for portfolio-level P&L calculations.
+Cons: Does not preserve full transaction history.
+
+**Alternative 2:** Store every buy transaction separately and derive cost basis when needed.
+Pros: More detailed and extensible for future analytics.
+Cons: More complex to implement and unnecessary for the current feature scope.
+
+Aspect: How P&L is restored after restart.
+
+**Alternative 1 (current choice):** Persist `averageBuyPrice`, `lastPrice`, and realized P&L in storage.
+Pros: Ensures gains/losses remain correct after reload.
+Cons: Requires a richer storage format.
+
+**Alternative 2:** Recompute values from market price only during loading.
+Pros: Simpler storage format.
+Cons: Incorrect because market price is not the same as cost basis.
 
 ---
 
