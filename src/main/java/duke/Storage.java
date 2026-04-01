@@ -9,7 +9,9 @@ import java.util.List;
 
 public class Storage {
     private static final String CORRUPTED_FILE_MESSAGE = "Corrupted storage file.";
+    private static final String CORRUPTED_WATCHLIST_FILE_MESSAGE = "Corrupted watchlist storage file.";
     private final Path filePath;
+    private final Path watchlistFilePath;
 
     public Storage(String filePath) {
         if (filePath == null || filePath.isBlank()) {
@@ -18,10 +20,12 @@ public class Storage {
 
         this.filePath = Paths.get(filePath);
         assert this.filePath.getFileName() != null : "Storage path must reference a file";
+        this.watchlistFilePath = this.filePath.resolveSibling(this.filePath.getFileName() + ".watchlist");
+        assert this.watchlistFilePath.getFileName() != null : "Watchlist storage path must reference a file";
     }
 
     public PortfolioBook load() throws AppException {
-        createFileIfMissing();
+        createStorageFileIfMissing();
         assert Files.exists(filePath) : "Storage file should exist after initialization";
 
         PortfolioBook portfolioBook = new PortfolioBook();
@@ -76,7 +80,7 @@ public class Storage {
         if (portfolioBook == null) {
             throw new IllegalArgumentException("portfolioBook must not be null");
         }
-        createFileIfMissing();
+        createStorageFileIfMissing();
 
         List<String> lines = new ArrayList<>();
         lines.add("ACTIVE|" + nullToEmpty(portfolioBook.getActivePortfolioName()));
@@ -103,6 +107,82 @@ public class Storage {
             Files.write(filePath, lines);
         } catch (IOException e) {
             throw new AppException("Unable to save storage file.");
+        }
+    }
+
+    /**
+     * Loads the watchlist from its storage file.
+     *
+     * @return loaded watchlist.
+     * @throws AppException if reading fails or content is invalid.
+     */
+    public Watchlist loadWatchlist() throws AppException {
+        createWatchlistFileIfMissing();
+        assert Files.exists(watchlistFilePath) : "Watchlist storage file should exist after initialization";
+
+        Watchlist watchlist = new Watchlist();
+
+        try {
+            List<String> lines = Files.readAllLines(watchlistFilePath);
+
+            for (String line : lines) {
+                if (line.isBlank()) {
+                    continue;
+                }
+
+                String[] parts = line.split("\\|", -1);
+                if (parts.length != 4) {
+                    throw new AppException(CORRUPTED_WATCHLIST_FILE_MESSAGE);
+                }
+
+                String recordType = parts[0].trim().toUpperCase();
+                if (!"WATCH".equals(recordType)) {
+                    throw new AppException(CORRUPTED_WATCHLIST_FILE_MESSAGE);
+                }
+
+                AssetType assetType = parseWatchlistAssetType(parts[1]);
+                String ticker = parseWatchlistTicker(parts[2]);
+                Double price = parseWatchlistOptionalPrice(parts[3]);
+
+                try {
+                    watchlist.addItem(assetType, ticker, price);
+                } catch (IllegalArgumentException e) {
+                    throw new AppException(CORRUPTED_WATCHLIST_FILE_MESSAGE);
+                }
+            }
+
+            return watchlist;
+        } catch (IOException e) {
+            throw new AppException("Unable to read watchlist storage file.");
+        }
+    }
+
+    /**
+     * Saves the watchlist to its storage file.
+     *
+     * @param watchlist watchlist to persist.
+     * @throws AppException if writing fails.
+     */
+    public void saveWatchlist(Watchlist watchlist) throws AppException {
+        if (watchlist == null) {
+            throw new IllegalArgumentException("watchlist must not be null");
+        }
+        createWatchlistFileIfMissing();
+
+        List<String> lines = new ArrayList<>();
+        for (WatchlistItem item : watchlist.getItems()) {
+            assert item != null : "Watchlist should not contain null entries";
+            String priceText = item.hasPrice() ? String.valueOf(item.targetPrice()) : "";
+            lines.add("WATCH|"
+                    + item.assetType().name() + "|"
+                    + item.ticker() + "|"
+                    + priceText);
+        }
+
+        try {
+            Files.write(watchlistFilePath, lines);
+        } catch (IOException e) {
+            throw new AppException("Unable to save watchlist storage file.");
         }
     }
 
@@ -221,23 +301,33 @@ public class Storage {
         portfolio.restoreHolding(assetType, ticker, quantity, restoredPrice, restoredPrice);
     }
 
-    private void createFileIfMissing() throws AppException {
+    private void createStorageFileIfMissing() throws AppException {
+        createFileIfMissing(filePath, "Unable to create storage file.", "Storage path is a directory.");
+    }
+
+    private void createWatchlistFileIfMissing() throws AppException {
+        createFileIfMissing(watchlistFilePath, "Unable to create watchlist storage file.",
+                "Watchlist storage path is a directory.");
+    }
+
+    private void createFileIfMissing(Path targetPath, String createFailureMessage, String directoryMessage)
+            throws AppException {
         try {
-            Path parent = filePath.getParent();
+            Path parent = targetPath.getParent();
             if (parent != null && !Files.exists(parent)) {
                 Files.createDirectories(parent);
             }
 
-            if (!Files.exists(filePath)) {
-                Files.createFile(filePath);
+            if (!Files.exists(targetPath)) {
+                Files.createFile(targetPath);
             }
 
-            if (Files.isDirectory(filePath)) {
-                throw new AppException("Storage path is a directory.");
+            if (Files.isDirectory(targetPath)) {
+                throw new AppException(directoryMessage);
             }
-            assert Files.exists(filePath) : "Storage file must exist after creation";
+            assert Files.exists(targetPath) : "Storage file must exist after creation";
         } catch (IOException e) {
-            throw new AppException("Unable to create storage file.");
+            throw new AppException(createFailureMessage);
         }
     }
 
@@ -318,6 +408,38 @@ public class Storage {
 
     private String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private AssetType parseWatchlistAssetType(String rawType) throws AppException {
+        try {
+            return AssetType.fromString(rawType);
+        } catch (IllegalArgumentException e) {
+            throw new AppException(CORRUPTED_WATCHLIST_FILE_MESSAGE);
+        }
+    }
+
+    private String parseWatchlistTicker(String rawTicker) throws AppException {
+        if (rawTicker == null || rawTicker.isBlank()) {
+            throw new AppException(CORRUPTED_WATCHLIST_FILE_MESSAGE);
+        }
+        return rawTicker.trim().toUpperCase();
+    }
+
+    private Double parseWatchlistOptionalPrice(String rawPrice) throws AppException {
+        String trimmed = rawPrice == null ? "" : rawPrice.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+
+        try {
+            double value = Double.parseDouble(trimmed);
+            if (value <= 0) {
+                throw new AppException(CORRUPTED_WATCHLIST_FILE_MESSAGE);
+            }
+            return value;
+        } catch (NumberFormatException e) {
+            throw new AppException(CORRUPTED_WATCHLIST_FILE_MESSAGE);
+        }
     }
 
     public record BulkUpdateResult(int successCount, int failedCount, List<String> failures) {
