@@ -49,16 +49,22 @@ public class Holding {
         if (quantityToAdd <= 0 || purchasePrice <= 0) {
             throw new IllegalArgumentException("quantityToAdd and purchasePrice must be > 0");
         }
+        //@@author zenweilow
         if (totalFees < 0) {
             throw new IllegalArgumentException("totalFees must be >= 0");
         }
+        //@@author Elegazia
 
         double totalCostBefore = averageBuyPrice * quantity;
+        //@@author zenweilow
         double addedCost = (purchasePrice * quantityToAdd) + totalFees;
+        //@@author Elegazia
         quantity += quantityToAdd;
         averageBuyPrice = (totalCostBefore + addedCost) / quantity;
-        assert quantity > 0 && averageBuyPrice > 0
-                : "Holding state must remain positive after adding quantity";
+        //@@author zenweilow
+        boolean hasValidHoldingState = quantity > 0 && averageBuyPrice > 0;
+        assert hasValidHoldingState : "Holding state must remain positive after adding quantity";
+        //@@author Elegazia
     }
 
     public double removeQuantity(double quantityToRemove, double sellPrice, double totalFees) {
@@ -68,21 +74,27 @@ public class Holding {
         if (sellPrice <= 0) {
             throw new IllegalArgumentException("sellPrice must be > 0");
         }
+        //@@author zenweilow
         if (totalFees < 0) {
             throw new IllegalArgumentException("totalFees must be >= 0");
         }
+        //@@author Elegazia
 
+        //@@author zenweilow
         double realizedPnl = (sellPrice * quantityToRemove) - totalFees - (averageBuyPrice * quantityToRemove);
+        //@@author Elegazia
         quantity -= quantityToRemove;
 
         if (quantity == 0) {
             averageBuyPrice = 0;
         }
 
+        //@@author zenweilow
         assert quantity >= 0 : "Holding quantity cannot become negative after removal";
-        assert quantity != 0 || averageBuyPrice == 0
+        boolean resetAverageBuyPriceCorrectly = quantity != 0 || averageBuyPrice == 0;
+        assert resetAverageBuyPriceCorrectly
                 : "Average buy price should reset when holding quantity becomes zero";
-
+        //@@author Elegazia
         return realizedPnl;
     }
 

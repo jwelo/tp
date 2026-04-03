@@ -88,30 +88,38 @@ public class Parser {
 
     private ParsedCommand parseAdd(List<String> tokens) throws AppException {
         Map<String, String> options = parseOptions(tokens);
+        //@@author zenweilow
         validateAllowedOptions(options, "--type", "--ticker", "--qty", "--price", "--brokerage", "--fx", "--platform");
+        //@@author RishabhShenoy03
         AssetType type = parseAssetType(requireOption(options, "--type"));
         String ticker = normaliseTicker(requireOption(options, "--ticker"));
         double qty = parsePositiveDouble(requireOption(options, "--qty"), "Quantity must be > 0");
         double price = parsePositiveDouble(requireOption(options, "--price"), "Price must be > 0");
+        //@@author zenweilow
         return new ParsedCommand(CommandType.ADD, null, type, ticker, qty, price,
                 parseOptionalNonNegativeDouble(options.get("--brokerage"), "Brokerage fee must be >= 0"),
                 parseOptionalNonNegativeDouble(options.get("--fx"), "FX fee must be >= 0"),
                 parseOptionalNonNegativeDouble(options.get("--platform"), "Platform fee must be >= 0"),
                 null, null);
+        //@@author RishabhShenoy03
     }
 
     private ParsedCommand parseRemove(List<String> tokens) throws AppException {
         Map<String, String> options = parseOptions(tokens);
+        //@@author zenweilow
         validateAllowedOptions(options, "--type", "--ticker", "--qty", "--price", "--brokerage", "--fx", "--platform");
+        //@@author RishabhShenoy03
         AssetType type = parseAssetType(requireOption(options, "--type"));
         String ticker = normaliseTicker(requireOption(options, "--ticker"));
         Double qty = parseOptionalPositiveDouble(options.get("--qty"), "Quantity must be > 0");
         Double price = parseOptionalPositiveDouble(options.get("--price"), "Price must be > 0");
+        //@@author zenweilow
         return new ParsedCommand(CommandType.REMOVE, null, type, ticker, qty, price,
                 parseOptionalNonNegativeDouble(options.get("--brokerage"), "Brokerage fee must be >= 0"),
                 parseOptionalNonNegativeDouble(options.get("--fx"), "FX fee must be >= 0"),
                 parseOptionalNonNegativeDouble(options.get("--platform"), "Platform fee must be >= 0"),
                 null, null);
+        //@@author RishabhShenoy03
     }
 
     private ParsedCommand parseSet(List<String> tokens) throws AppException {
@@ -192,6 +200,7 @@ public class Parser {
                 null, null, null, rawOptions, null);
     }
 
+    //@@author zenweilow
     private ParsedCommand parseNoArgCommand(List<String> tokens, CommandType commandType) throws AppException {
         if (tokens.size() != 1) {
             throw new AppException("Usage: /" + commandType.name().toLowerCase());
@@ -200,6 +209,7 @@ public class Parser {
                 null, null, null, null, null);
     }
 
+    //@@author RishabhShenoy03
     private Map<String, String> parseOptions(List<String> tokens) throws AppException {
         return parseOptions(tokens, 1);
     }
@@ -213,18 +223,21 @@ public class Parser {
             }
             String key = tokens.get(i);
             String value = tokens.get(i + 1);
+            //@@author zenweilow
             if (!key.startsWith("--")) {
                 throw new AppException("Invalid option: " + key);
             }
             if (options.containsKey(key.toLowerCase())) {
                 throw new AppException("Duplicate option: " + key.toLowerCase());
             }
+            //@@author RishabhShenoy03
             options.put(key.toLowerCase(), value);
         }
 
         return options;
     }
 
+    //@@author zenweilow
     private void validateAllowedOptions(Map<String, String> options, String... allowedKeys) throws AppException {
         List<String> allowed = List.of(allowedKeys);
         for (String key : options.keySet()) {
@@ -234,6 +247,7 @@ public class Parser {
         }
     }
 
+    //@@author RishabhShenoy03
     private String requireOption(Map<String, String> options, String key) throws AppException {
         String value = options.get(key);
         if (value == null || value.isBlank()) {
@@ -261,6 +275,7 @@ public class Parser {
         return parsePositiveDouble(rawValue, errorMessage);
     }
 
+    //@@author zenweilow
     private Double parseOptionalNonNegativeDouble(String rawValue, String errorMessage) throws AppException {
         if (rawValue == null) {
             return null;
@@ -277,6 +292,7 @@ public class Parser {
         }
     }
 
+    //@@author RishabhShenoy03
     private AssetType parseAssetType(String rawValue) throws AppException {
         try {
             return AssetType.fromString(rawValue);

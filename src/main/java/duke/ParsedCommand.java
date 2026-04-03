@@ -9,12 +9,15 @@ public record ParsedCommand(
         String ticker,
         Double quantity,
         Double price,
+        //@@author zenweilow
         Double brokerageFee,
         Double fxFee,
         Double platformFee,
+        //@@author RishabhShenoy03
         String listTarget,
         Path filePath
 ) {
+    //@@author zenweilow
     public double totalFees() {
         return zeroIfNull(brokerageFee) + zeroIfNull(fxFee) + zeroIfNull(platformFee);
     }
