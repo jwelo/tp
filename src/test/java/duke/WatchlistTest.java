@@ -66,6 +66,22 @@ public class WatchlistTest {
     }
 
     @Test
+    void buyItem_withMixedCasePortfolioName_usesLowercasePortfolio() throws AppException {
+        Watchlist watchlist = new Watchlist();
+        watchlist.addItem(AssetType.STOCK, "VOO", 600.0);
+
+        PortfolioBook portfolioBook = new PortfolioBook();
+        portfolioBook.createPortfolio("Growth");
+
+        Watchlist.BuyResult result = watchlist.buyItem(AssetType.STOCK, "VOO", 1.0, "GROWTH", portfolioBook);
+
+        assertEquals("growth", result.portfolioName());
+        Portfolio portfolio = portfolioBook.getPortfolio("growth");
+        assertNotNull(portfolio);
+        assertTrue(portfolio.hasHolding(AssetType.STOCK, "VOO"));
+    }
+
+    @Test
     void buyItem_withoutPrice_throwsException() throws AppException {
         Watchlist watchlist = new Watchlist();
         watchlist.addItem(AssetType.STOCK, "VOO", null);

@@ -3,6 +3,7 @@ package duke;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class PortfolioBook {
@@ -15,31 +16,31 @@ public class PortfolioBook {
     }
 
     public void createPortfolio(String name) throws AppException {
-        if (name == null || name.isBlank()) {
-            throw new AppException("Portfolio name cannot be blank");
-        }
-        if (portfolios.containsKey(name)) {
-            throw new AppException("Portfolio already exists: " + name);
+        String normalisedName = requireNormalizedPortfolioName(name);
+        if (portfolios.containsKey(normalisedName)) {
+            throw new AppException("Portfolio already exists: " + normalisedName);
         }
 
-        portfolios.put(name, new Portfolio(name));
+        portfolios.put(normalisedName, new Portfolio(normalisedName));
 
         if (activePortfolioName == null) {
-            activePortfolioName = name;
+            activePortfolioName = normalisedName;
         }
     }
 
     public void ensurePortfolioExists(String name) throws AppException {
-        if (!portfolios.containsKey(name)) {
+        String normalisedName = requireNormalizedPortfolioName(name);
+        if (!portfolios.containsKey(normalisedName)) {
             createPortfolio(name);
         }
     }
 
     public void usePortfolio(String name) throws AppException {
-        if (!portfolios.containsKey(name)) {
-            throw new AppException("Portfolio not found: " + name);
+        String normalisedName = requireNormalizedPortfolioName(name);
+        if (!portfolios.containsKey(normalisedName)) {
+            throw new AppException("Portfolio not found: " + normalisedName);
         }
-        activePortfolioName = name;
+        activePortfolioName = normalisedName;
     }
 
     public boolean hasActivePortfolio() {
@@ -62,6 +63,16 @@ public class PortfolioBook {
     }
 
     public Portfolio getPortfolio(String name) {
-        return portfolios.get(name);
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        return portfolios.get(name.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private String requireNormalizedPortfolioName(String name) throws AppException {
+        if (name == null || name.isBlank()) {
+            throw new AppException("Portfolio name cannot be blank");
+        }
+        return name.trim().toLowerCase(Locale.ROOT);
     }
 }

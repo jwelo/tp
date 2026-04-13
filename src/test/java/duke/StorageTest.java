@@ -73,6 +73,24 @@ public class StorageTest {
     }
 
     @Test
+    void load_mixedCasePortfolioNames_normalizesToLowercase(@TempDir Path tempDir) throws Exception {
+        Path file = tempDir.resolve("data.txt");
+        Files.write(file, List.of(
+                "ACTIVE|Growth",
+                "PORTFOLIO|Growth|0.0"
+        ));
+        Storage storage = new Storage(file.toString());
+
+        PortfolioBook loaded = storage.load();
+
+        assertEquals("growth", loaded.getActivePortfolioName());
+        assertNotNull(loaded.getPortfolio("growth"));
+        storage.save(loaded);
+        assertTrue(Files.readAllLines(file).contains("ACTIVE|growth"));
+        assertTrue(Files.readAllLines(file).contains("PORTFOLIO|growth|0.0"));
+    }
+
+    @Test
     void loadPriceUpdates_validCsv_updatesPrices(@TempDir Path tempDir) throws Exception {
         Path storageFile = tempDir.resolve("data.txt");
         Storage storage = new Storage(storageFile.toString());

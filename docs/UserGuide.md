@@ -54,6 +54,8 @@ Notes about command syntax:
 - Duplicate options in one command are rejected.
 - Unknown options are rejected.
 - Portfolio names can contain spaces when quoted. Example: `/create "Long Term"`.
+- Portfolio names are case-insensitive. Example: `/use GROWTH` is treated as `/use growth`.
+- Portfolio names are normalized to lowercase (for example, `Growth` becomes `growth`).
 - Quantity and price fields that require positive values must be finite and `> 0` (for example, `NaN` and `Infinity` are rejected).
 - Fee fields (`--brokerage`, `--fx`, `--platform`) must be `>= 0`.
 
@@ -112,6 +114,7 @@ Examples:
 Constraint:
 
 - Portfolio name must not start with `/`.
+- Portfolio name matching is case-insensitive and stored in lowercase.
 
 Expected result:
 
@@ -132,7 +135,7 @@ Example:
 
 Expected result:
 
-- Active portfolio changes to `NAME`.
+- Active portfolio changes to `NAME` (case-insensitive match).
 
 ### List holdings or portfolios: `/list`
 

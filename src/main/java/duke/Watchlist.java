@@ -127,7 +127,7 @@ public class Watchlist {
             holding.setLastPrice(buyPrice);
         }
         items.remove(key);
-        return new BuyResult(trimmedPortfolioName, item.assetType(), item.ticker(), quantity,
+        return new BuyResult(portfolio.getName(), item.assetType(), item.ticker(), quantity,
                 buyPrice, resultingQuantity);
     }
 

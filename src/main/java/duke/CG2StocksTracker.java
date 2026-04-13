@@ -150,7 +150,9 @@ public class CG2StocksTracker {
         String name = command.name();
         portfolioBook.createPortfolio(name);
         save();
-        ui.showMessage("Created portfolio: " + name);
+        Portfolio createdPortfolio = portfolioBook.getPortfolio(name);
+        assert createdPortfolio != null : "Created portfolio should exist";
+        ui.showMessage("Created portfolio: " + createdPortfolio.getName());
         ui.showMessage("Active portfolio: " + portfolioBook.getActivePortfolioName());
     }
 
@@ -164,7 +166,7 @@ public class CG2StocksTracker {
         String name = command.name();
         portfolioBook.usePortfolio(name);
         save();
-        ui.showMessage("Active portfolio: " + name);
+        ui.showMessage("Active portfolio: " + portfolioBook.getActivePortfolioName());
     }
 
     /**
