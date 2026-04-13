@@ -424,9 +424,19 @@ public class CG2StocksTracker {
     /**
      * Parses optional arguments for the /insights command.
      *
+     * Supported options:
+     * - --type [stock|etf|bond]: Filter holdings by asset type
+     * - --top N: Limit results to top N holdings by unrealized P&L
+     * - --chart: Display a visual P&L chart
+     *
+     * Validation:
+     * - Duplicate flags are rejected (e.g., --type stock --type etf)
+     * - Missing values are detected (e.g., --type --top 5)
+     * - --top value must be a positive integer not exceeding 10,000
+     *
      * @param rawOptions raw option string captured from the parser.
      * @return parsed insights options.
-     * @throws AppException if the options are malformed or unsupported.
+     * @throws AppException if the options are malformed, unsupported, or duplicate flags are provided.
      */
     private InsightsOptions parseInsightsOptions(String rawOptions) throws AppException {
         if (rawOptions == null || rawOptions.isBlank()) {
@@ -453,8 +463,12 @@ public class CG2StocksTracker {
                 if (i + 1 >= tokens.length) {
                     throw new AppException("Usage: /insights [--type stock|etf|bond] [--top N] [--chart]");
                 }
+                String typeValue = tokens[++i];
+                if (typeValue.startsWith("--")) {
+                    throw new AppException("Missing value for option: --type");
+                }
                 try {
-                    filterType = AssetType.fromString(tokens[++i]);
+                    filterType = AssetType.fromString(typeValue);
                 } catch (IllegalArgumentException e) {
                     throw new AppException(e.getMessage());
                 }
@@ -467,13 +481,20 @@ public class CG2StocksTracker {
                 if (i + 1 >= tokens.length) {
                     throw new AppException("Usage: /insights [--type stock|etf|bond] [--top N] [--chart]");
                 }
+                String topValue = tokens[++i];
+                if (topValue.startsWith("--")) {
+                    throw new AppException("Missing value for option: --top");
+                }
                 try {
-                    topN = Integer.parseInt(tokens[++i]);
+                    topN = Integer.parseInt(topValue);
                 } catch (NumberFormatException e) {
                     throw new AppException("Top count must be a positive integer.");
                 }
                 if (topN <= 0) {
                     throw new AppException("Top count must be a positive integer.");
+                }
+                if (topN > 10000) {
+                    throw new AppException("Top count must not exceed 10000.");
                 }
                 seenTop = true;
                 break;
