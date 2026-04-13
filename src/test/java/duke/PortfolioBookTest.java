@@ -17,15 +17,15 @@ public class PortfolioBookTest {
     }
 
     @Test
-    void createPortfolio_normalizesNameToLowercase() throws AppException {
+    void createPortfolio_preservesOriginalNameCasing() throws AppException {
         PortfolioBook book = new PortfolioBook();
 
         book.createPortfolio("Growth");
 
-        assertEquals("growth", book.getActivePortfolioName());
+        assertEquals("Growth", book.getActivePortfolioName());
         Portfolio created = book.getPortfolio("GROWTH");
         assertNotNull(created);
-        assertEquals("growth", created.getName());
+        assertEquals("Growth", created.getName());
     }
 
     @Test
@@ -35,17 +35,17 @@ public class PortfolioBookTest {
 
         AppException ex = assertThrows(AppException.class, () -> book.createPortfolio("growth"));
 
-        assertEquals("Portfolio already exists: growth", ex.getMessage());
+        assertEquals("Portfolio already exists: Growth", ex.getMessage());
     }
 
     @Test
     void usePortfolio_acceptsMixedCaseName() throws AppException {
         PortfolioBook book = new PortfolioBook();
         book.createPortfolio("first");
-        book.createPortfolio("second");
+        book.createPortfolio("SecondPortfolio");
 
-        book.usePortfolio("SeCoNd");
+        book.usePortfolio("sEcOnDpOrTfOlIo");
 
-        assertEquals("second", book.getActivePortfolioName());
+        assertEquals("SecondPortfolio", book.getActivePortfolioName());
     }
 }

@@ -73,7 +73,7 @@ public class StorageTest {
     }
 
     @Test
-    void load_mixedCasePortfolioNames_normalizesToLowercase(@TempDir Path tempDir) throws Exception {
+    void load_mixedCasePortfolioNames_preservesOriginalCasing(@TempDir Path tempDir) throws Exception {
         Path file = tempDir.resolve("data.txt");
         Files.write(file, List.of(
                 "ACTIVE|Growth",
@@ -83,11 +83,11 @@ public class StorageTest {
 
         PortfolioBook loaded = storage.load();
 
-        assertEquals("growth", loaded.getActivePortfolioName());
+        assertEquals("Growth", loaded.getActivePortfolioName());
         assertNotNull(loaded.getPortfolio("growth"));
         storage.save(loaded);
-        assertTrue(Files.readAllLines(file).contains("ACTIVE|growth"));
-        assertTrue(Files.readAllLines(file).contains("PORTFOLIO|growth|0.0"));
+        assertTrue(Files.readAllLines(file).contains("ACTIVE|Growth"));
+        assertTrue(Files.readAllLines(file).contains("PORTFOLIO|Growth|0.0"));
     }
 
     @Test

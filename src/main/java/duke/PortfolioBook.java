@@ -8,54 +8,60 @@ import java.util.Map;
 
 public class PortfolioBook {
     private final Map<String, Portfolio> portfolios;
-    private String activePortfolioName;
+    private String activePortfolioKey;
 
     public PortfolioBook() {
         this.portfolios = new LinkedHashMap<>();
-        this.activePortfolioName = null;
+        this.activePortfolioKey = null;
     }
 
     public void createPortfolio(String name) throws AppException {
-        String normalisedName = requireNormalizedPortfolioName(name);
-        if (portfolios.containsKey(normalisedName)) {
-            throw new AppException("Portfolio already exists: " + normalisedName);
+        String displayName = requireDisplayPortfolioName(name);
+        String portfolioKey = toPortfolioKey(displayName);
+        if (portfolios.containsKey(portfolioKey)) {
+            throw new AppException("Portfolio already exists: " + portfolios.get(portfolioKey).getName());
         }
 
-        portfolios.put(normalisedName, new Portfolio(normalisedName));
+        portfolios.put(portfolioKey, new Portfolio(displayName));
 
-        if (activePortfolioName == null) {
-            activePortfolioName = normalisedName;
+        if (activePortfolioKey == null) {
+            activePortfolioKey = portfolioKey;
         }
     }
 
     public void ensurePortfolioExists(String name) throws AppException {
-        String normalisedName = requireNormalizedPortfolioName(name);
-        if (!portfolios.containsKey(normalisedName)) {
+        String portfolioKey = requirePortfolioKey(name);
+        if (!portfolios.containsKey(portfolioKey)) {
             createPortfolio(name);
         }
     }
 
     public void usePortfolio(String name) throws AppException {
-        String normalisedName = requireNormalizedPortfolioName(name);
-        if (!portfolios.containsKey(normalisedName)) {
-            throw new AppException("Portfolio not found: " + normalisedName);
+        String displayName = requireDisplayPortfolioName(name);
+        String portfolioKey = toPortfolioKey(displayName);
+        if (!portfolios.containsKey(portfolioKey)) {
+            throw new AppException("Portfolio not found: " + displayName);
         }
-        activePortfolioName = normalisedName;
+        activePortfolioKey = portfolioKey;
     }
 
     public boolean hasActivePortfolio() {
-        return activePortfolioName != null;
+        return activePortfolioKey != null;
     }
 
     public Portfolio getActivePortfolio() throws AppException {
-        if (activePortfolioName == null) {
+        if (activePortfolioKey == null) {
             throw new AppException("No active portfolio selected. Use: /use NAME");
         }
-        return portfolios.get(activePortfolioName);
+        return portfolios.get(activePortfolioKey);
     }
 
     public String getActivePortfolioName() {
-        return activePortfolioName;
+        if (activePortfolioKey == null) {
+            return null;
+        }
+        Portfolio active = portfolios.get(activePortfolioKey);
+        return active == null ? null : active.getName();
     }
 
     public List<Portfolio> getPortfolios() {
@@ -66,13 +72,21 @@ public class PortfolioBook {
         if (name == null || name.isBlank()) {
             return null;
         }
-        return portfolios.get(name.trim().toLowerCase(Locale.ROOT));
+        return portfolios.get(toPortfolioKey(name.trim()));
     }
 
-    private String requireNormalizedPortfolioName(String name) throws AppException {
+    private String requireDisplayPortfolioName(String name) throws AppException {
         if (name == null || name.isBlank()) {
             throw new AppException("Portfolio name cannot be blank");
         }
+        return name.trim();
+    }
+
+    private String requirePortfolioKey(String name) throws AppException {
+        return toPortfolioKey(requireDisplayPortfolioName(name));
+    }
+
+    private String toPortfolioKey(String name) {
         return name.trim().toLowerCase(Locale.ROOT);
     }
 }

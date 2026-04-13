@@ -66,7 +66,7 @@ public class WatchlistTest {
     }
 
     @Test
-    void buyItem_withMixedCasePortfolioName_usesLowercasePortfolio() throws AppException {
+    void buyItem_withMixedCasePortfolioName_preservesPortfolioDisplayName() throws AppException {
         Watchlist watchlist = new Watchlist();
         watchlist.addItem(AssetType.STOCK, "VOO", 600.0);
 
@@ -75,7 +75,7 @@ public class WatchlistTest {
 
         Watchlist.BuyResult result = watchlist.buyItem(AssetType.STOCK, "VOO", 1.0, "GROWTH", portfolioBook);
 
-        assertEquals("growth", result.portfolioName());
+        assertEquals("Growth", result.portfolioName());
         Portfolio portfolio = portfolioBook.getPortfolio("growth");
         assertNotNull(portfolio);
         assertTrue(portfolio.hasHolding(AssetType.STOCK, "VOO"));
