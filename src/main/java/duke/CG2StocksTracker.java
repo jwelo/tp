@@ -30,7 +30,18 @@ public class CG2StocksTracker {
         try {
             loadedBook = storage.load();
         } catch (AppException e) {
-            ui.showMessage("Storage load failed: " + e.getMessage());
+            if (storage.isCorruptedStorage(e)) {
+                try {
+                    Path preservedFile = storage.quarantineCorruptedStorageFile();
+                    ui.showMessage("Storage load failed: " + e.getMessage()
+                            + " Preserved original file as: " + preservedFile.getFileName());
+                } catch (AppException quarantineError) {
+                    ui.showMessage("Storage load failed: " + e.getMessage()
+                            + " " + quarantineError.getMessage());
+                }
+            } else {
+                ui.showMessage("Storage load failed: " + e.getMessage());
+            }
             loadedBook = new PortfolioBook();
         }
         this.portfolioBook = loadedBook;
